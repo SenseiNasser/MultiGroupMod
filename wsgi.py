@@ -47,11 +47,9 @@ def webhook():
         update_json = request.get_json(force=True)
         update = Update.de_json(update_json, telegram_app.bot)
 
-        # Process update in async context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(telegram_app.process_update(update))
-        loop.close()
+        # Use asyncio.run() to handle the event loop
+        asyncio.run(telegram_app.process_update(update))
+        logger.debug(f"Finished processing update ID: {update.update_id}")
 
     except Exception as e:
         logger.error(f"Error processing update: {e}")
