@@ -1,6 +1,9 @@
+import asyncio
 import logging
 from flask import Flask, request, abort
 from telegram import Update
+import os
+
 
 # Configure logging
 logging.basicConfig(
