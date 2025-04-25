@@ -1,5 +1,5 @@
 python-telegram-bot==21.6
 redis==5.0.1
 python-dotenv==1.0.0
-flask==2.3.3
-gunicorn==21.2.0
+fastapi==0.113.0  # Or latest
+uvicorn[standard]==0.30.3  # Or latest, [standard] includes performance extras
