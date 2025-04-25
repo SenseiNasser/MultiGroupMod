@@ -90,6 +90,11 @@ async def ban_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user = update.message.reply_to_message.from_user
     target_id = target_user.id
     
+    # Prevent banning an admin
+    if target_id in ADMIN_IDS:
+        await update.message.reply_text("You cannot ban another admin.")
+        return
+    
     # Get all messages for this user
     messages = db.get_user_messages(target_id)
     
