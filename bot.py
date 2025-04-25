@@ -1,6 +1,7 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.error import BadRequest  # Import BadRequest
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_PORT, ADMIN_IDS, GROUP_IDS
 from database import Database
 
@@ -19,7 +20,12 @@ application = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
-    await update.message.reply_text('Hi! I am your group moderation bot.')
+    logger.info(f"'/start' command received from user {update.effective_user.id} in chat {update.effective_chat.id}")
+    try:
+        await update.message.reply_text('Hi! I am your group moderation bot.')
+        logger.info(f"Successfully replied to '/start' from user {update.effective_user.id}")
+    except Exception as e:
+        logger.error(f"Error replying to /start: {e}", exc_info=True)
 
 async def store_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Store every message in the database."""
@@ -36,7 +42,7 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Please reply to a user's message to get their ID.")
         return
-    
+
     target_user = update.message.reply_to_message.from_user
     response = (
         f"User Information:\n"
@@ -45,7 +51,18 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"ID: {target_user.id}\n"
         f"Language: {target_user.language_code if target_user.language_code else 'N/A'}"
     )
-    await update.message.reply_text(response)
+    try:
+        await update.message.reply_text(response)
+    except BadRequest as e:
+        if "Message to be replied not found" in str(e):
+            logger.warning(f"Failed to reply for /user_id: Original message likely deleted. Error: {e}")
+            await update.message.reply_text("Couldn't reply. The message you replied to might have been deleted.")
+        else:
+            logger.error(f"Error in /user_id reply: {e}", exc_info=True)
+            await update.message.reply_text("An error occurred while trying to get user info.")
+    except Exception as e:
+        logger.error(f"Unexpected error in /user_id: {e}", exc_info=True)
+        await update.message.reply_text("An unexpected error occurred.")
 
 async def check_user_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check which groups a user has joined."""
