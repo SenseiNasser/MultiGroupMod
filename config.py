@@ -16,10 +16,10 @@ if not BOT_TOKEN:
     raise ValueError("Missing BOT_TOKEN environment variable")
 
 # --- Webhook Configuration ---
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # This was missing
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 WEBHOOK_PORT = int(os.environ.get("WEBHOOK_PORT", 8443))
+
 # --- Bot Permissions ---
-# (Keep ADMIN_IDS and GROUP_IDS loading logic as before)
 ADMIN_IDS_STR = os.environ.get("ADMIN_IDS", "")
 try:
     ADMIN_IDS = set(int(admin_id.strip()) for admin_id in ADMIN_IDS_STR.split(',') if admin_id.strip())
@@ -38,32 +38,40 @@ except ValueError as e:
 
 # --- Database (Redis) Configuration ---
 REDIS_HOST = os.environ.get("REDIS_HOST")
+REDIS_PORT_STR = os.environ.get("REDIS_PORT", "6379")
+REDIS_DB_STR = os.environ.get("REDIS_DB", "0")
+REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD")
+REDIS_USER = os.environ.get("REDIS_USER")
+REDIS_SSL_STR = os.environ.get("REDIS_SSL", "False")
+
+# Validate Port
+try:
+    REDIS_PORT = int(REDIS_PORT_STR)
+except (ValueError, TypeError):
+    logger.error(f"Invalid REDIS_PORT value '{REDIS_PORT_STR}'. Must be an integer.", exc_info=True)
+    REDIS_PORT = None
+
+# Validate DB
+try:
+    REDIS_DB = int(REDIS_DB_STR)
+except (ValueError, TypeError):
+    logger.error(f"Invalid REDIS_DB value '{REDIS_DB_STR}'. Must be an integer.", exc_info=True)
+    REDIS_DB = 0
+
+# Validate Host
 if not REDIS_HOST:
     logger.warning("REDIS_HOST not found in environment. Database connection will likely fail.")
 
-try:
-    REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379)) # Default only if not security critical
-except (ValueError, TypeError):
-     logger.error("Invalid REDIS_PORT value. Must be an integer.", exc_info=True)
-     REDIS_PORT = None # Indicate error
+# Validate Auth requirements
+if REDIS_HOST and not REDIS_USER:
+    logger.warning(f"REDIS_USER is not set for host {REDIS_HOST}. Authentication might fail.")
+if REDIS_HOST and not REDIS_PASSWORD:
+    logger.warning(f"REDIS_PASSWORD is not set for host {REDIS_HOST}. Authentication might fail.")
 
-try:
-    REDIS_DB = int(os.environ.get("REDIS_DB", 0))
-except (ValueError, TypeError):
-    logger.error("Invalid REDIS_DB value. Must be an integer.", exc_info=True)
-    REDIS_DB = 0 # Default to 0 on error
-
-REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD") # Load password (will be None if not set)
-if not REDIS_PASSWORD and REDIS_HOST: # Check if host is set but password isn't (Upstash NEEDS password)
-    logger.warning(f"REDIS_PASSWORD is not set for host {REDIS_HOST}. Connection might fail.")
-
-# --- SSL Setting for Redis ---
-# Read REDIS_SSL as a string and convert to boolean
-redis_ssl_str = os.environ.get("REDIS_SSL", "False").lower()
-REDIS_SSL = redis_ssl_str in ['true', '1', 't', 'y', 'yes']
+# Convert SSL String to Boolean
+REDIS_SSL = REDIS_SSL_STR.lower() in ['true', '1', 't', 'y', 'yes']
 
 # --- Message Retention ---
-# (Keep MESSAGE_RETENTION loading logic as before)
 DEFAULT_RETENTION = 7 * 24 * 60 * 60
 try:
     MESSAGE_RETENTION = int(os.environ.get("MESSAGE_RETENTION", DEFAULT_RETENTION))
@@ -71,17 +79,18 @@ try:
         logger.warning(f"MESSAGE_RETENTION must be positive, using default: {DEFAULT_RETENTION}s")
         MESSAGE_RETENTION = DEFAULT_RETENTION
     else:
-         logger.info(f"Message retention set to: {MESSAGE_RETENTION} seconds")
+        logger.info(f"Message retention set to: {MESSAGE_RETENTION} seconds")
 except ValueError:
     logger.error(f"Invalid MESSAGE_RETENTION value, using default: {DEFAULT_RETENTION}s", exc_info=True)
     MESSAGE_RETENTION = DEFAULT_RETENTION
 
 # --- Log loaded Redis config ---
 redis_log_host = REDIS_HOST or "Not Set"
-redis_log_port = REDIS_PORT or "Not Set"
+redis_log_port = REDIS_PORT if REDIS_PORT is not None else "Invalid"
 redis_log_db = REDIS_DB
+redis_log_user_status = "Set" if REDIS_USER else "Not Set"
 redis_log_pass_status = "Set" if REDIS_PASSWORD else "Not Set"
 redis_log_ssl = REDIS_SSL
-logger.info(f"Redis Config: Host={redis_log_host}, Port={redis_log_port}, DB={redis_log_db}, Password={redis_log_pass_status}, SSL={redis_log_ssl}")
+logger.info(f"Redis Config: Host={redis_log_host}, Port={redis_log_port}, DB={redis_log_db}, User={redis_log_user_status}, Password={redis_log_pass_status}, SSL={redis_log_ssl}")
 
 logger.info("Configuration loaded.")

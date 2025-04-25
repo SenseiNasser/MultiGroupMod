@@ -2,13 +2,13 @@
 
 import redis
 import logging
-# Import necessary config variables FROM config.py
 from config import (
     REDIS_HOST,
     REDIS_PORT,
     REDIS_DB,
+    REDIS_USER,     # Add username import
     REDIS_PASSWORD,
-    REDIS_SSL, # Import the SSL setting
+    REDIS_SSL,
     MESSAGE_RETENTION
 )
 
@@ -16,39 +16,41 @@ logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
-        self.redis = None # Initialize to None
-        # Check if essential Redis config is present
-        if not all([REDIS_HOST, REDIS_PORT is not None, REDIS_PASSWORD]):
-            logger.critical("FATAL: Missing essential Redis configuration (HOST, PORT, PASSWORD). Cannot initialize database.")
-            # Optionally raise an exception here to halt startup if DB is critical
-            # raise ConnectionError("Missing Redis Configuration")
-            return  # Exit init if config is missing
+        self.redis = None
+        # Validate Redis configuration
+        if not all([REDIS_HOST, REDIS_PORT is not None, REDIS_USER, REDIS_PASSWORD]):
+            logger.critical("FATAL: Missing essential Redis configuration (HOST, PORT, USER, PASSWORD)")
+            return
 
         try:
-            logger.info(f"Attempting to connect to Redis: {REDIS_HOST}:{REDIS_PORT}, DB: {REDIS_DB}, SSL: {REDIS_SSL}")
+            logger.info(f"Connecting to Redis: {REDIS_HOST}:{REDIS_PORT}, DB: {REDIS_DB}, SSL: {REDIS_SSL}")
             self.redis = redis.Redis(
-                host=REDIS_HOST,         # Use variable from config
-                port=REDIS_PORT,         # Use variable from config
-                db=REDIS_DB,             # Use variable from config
-                password=REDIS_PASSWORD, # Use variable from config
-                ssl=REDIS_SSL,           # Use variable from config
+                host=REDIS_HOST,
+                port=REDIS_PORT,
+                db=REDIS_DB,
+                username=REDIS_USER,     # Add username parameter
+                password=REDIS_PASSWORD,
+                ssl=REDIS_SSL,
                 decode_responses=True,
-                socket_timeout=10,       # Increased timeout for potentially higher latency external DB
-                socket_connect_timeout=10
+                socket_timeout=15,
+                socket_connect_timeout=15
             )
             # Test connection
             self.redis.ping()
-            logger.info(f"Successfully connected to Redis at {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
+            logger.info("Successfully connected to Redis")
 
-        except redis.exceptions.AuthenticationError:
-            logger.critical(f"FATAL: Redis authentication failed for host {REDIS_HOST}. Check REDIS_PASSWORD.", exc_info=True)
-            self.redis = None # Ensure redis is None on failure
+        except redis.exceptions.AuthenticationError as e:
+            logger.critical(f"Redis authentication failed. Error: {e}", exc_info=True)
+            self.redis = None
         except redis.exceptions.ConnectionError as e:
-            logger.critical(f"FATAL: Could not connect to Redis at {REDIS_HOST}:{REDIS_PORT}. Error: {e}", exc_info=True)
-            self.redis = None # Ensure redis is None on failure
+            logger.critical(f"Redis connection failed. Error: {e}", exc_info=True)
+            self.redis = None
+        except redis.exceptions.TimeoutError as e:
+            logger.critical(f"Redis connection timeout. Error: {e}", exc_info=True)
+            self.redis = None
         except Exception as e:
-            logger.critical(f"FATAL: An unexpected error occurred during Redis initialization. Error: {e}", exc_info=True)
-            self.redis = None # Ensure redis is None on failure
+            logger.critical(f"Unexpected Redis error: {e}", exc_info=True)
+            self.redis = None
 
 
     def _check_connection(self):
