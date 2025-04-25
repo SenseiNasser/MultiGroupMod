@@ -37,4 +37,4 @@ ENV/
 *.log
 
 # Redis
-dump.rdb 
+dump.rdb

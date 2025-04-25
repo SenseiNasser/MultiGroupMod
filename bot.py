@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 # Initialize database
 db = Database()
 
+# Initialize application globally
+application = None
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     await update.message.reply_text('Hi! I am your group moderation bot.')
@@ -90,12 +93,20 @@ async def ban_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Get all messages for this user
     messages = db.get_user_messages(target_id)
     
-    # Delete all messages
+    # Batch delete messages
+    delete_tasks = []
     for chat_id, message_id in messages:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except Exception as e:
-            logger.error(f"Error deleting message: {e}")
+        delete_tasks.append(
+            context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=message_id
+            )
+        )
+    
+    # Process in batches of 20
+    for i in range(0, len(delete_tasks), 20):
+        await asyncio.gather(*delete_tasks[i:i+20], return_exceptions=True)
+        await asyncio.sleep(1)  # Rate limiting
     
     # Ban user from all groups
     for group_id in GROUP_IDS:
@@ -116,25 +127,26 @@ async def ban_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "and their messages have been deleted."
     )
 
-def main():
-    """Start the bot."""
-    # Create the Application and pass it your bot's token
-    application = Application.builder().token(BOT_TOKEN).build()
+# Build the application instance - SINGLE SOURCE OF TRUTH
+application = Application.builder().token(BOT_TOKEN).build()
 
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("banall", ban_all))
-    application.add_handler(CommandHandler("user_id", get_user_id))
-    application.add_handler(CommandHandler("user_is_join", check_user_groups))
-    application.add_handler(MessageHandler(filters.ALL, store_message))
+# Add handlers directly
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("banall", ban_all))
+application.add_handler(CommandHandler("user_id", get_user_id))
+application.add_handler(CommandHandler("user_is_join", check_user_groups))
+# Remove this entire block:
+#     if WEBHOOK_URL:
+#         # Proper webhook configuration
+#         application.run_webhook(
+#             listen="0.0.0.0",
+#             port=WEBHOOK_PORT,
+#             webhook_url=f"{WEBHOOK_URL}/webhook",  # Fixed endpoint
+#             secret_token='YOUR_SECRET_TOKEN',  # Add this for security
+#             drop_pending_updates=True
+#         )
+#     else:
+#         application.run_polling()
 
-    # Set up webhook
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=WEBHOOK_PORT,
-        url_path=BOT_TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"
-    )
-
-if __name__ == '__main__':
-    main() 
+# Just keep the handler registration:
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), store_message))
