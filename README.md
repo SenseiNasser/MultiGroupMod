@@ -1,4 +1,4 @@
-# Telegram Group Moderation Bot
+# MultiGroupMod
 
 A powerful moderation bot that can manage multiple Telegram groups simultaneously, with features for banning users and deleting their messages across all groups.
 
@@ -28,8 +28,8 @@ These steps allow you to run the bot on your local machine for testing.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/SenseiNasser/telegram-group-moderation-bot.git
-    cd telegram-group-moderation-bot
+    git clone https://github.com/SenseiNasser/MultiGroupMod.git
+    cd MultiGroupMod
     ```
 
 2.  **Set up a virtual environment (Recommended):**
